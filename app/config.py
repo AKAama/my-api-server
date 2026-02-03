@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ServerConfig(BaseModel):
@@ -44,7 +44,7 @@ class NatsConfig(BaseModel):
     imagesProcConsumerName: str
     clientId: str
     defaultAccountName: str
-    account: Dict[str, NatsAccount]
+    account: Dict[str, NatsAccount] = Field(default_factory=dict)
 
 
 class Settings(BaseModel):
@@ -64,13 +64,15 @@ def get_settings(config_path: Optional[str] = None) -> Settings:
     if config_path:
         path = Path(config_path)
     else:
-        env_path = os.getenv("CONFIG")
+        env_path = os.getenv("MYAPI_CONFIG")
         path = Path(env_path) if env_path else _default_config_path()
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
 
     with path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
+    if raw is None:
+        raise ValueError("Config file is empty")
 
     return Settings(**raw)
 

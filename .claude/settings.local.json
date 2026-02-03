@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mysql:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(curl:*)",
+      "Bash(source:*)",
+      "Bash(python:*)",
+      "Bash(python -c \"from app.main import app; print\\(''main.py OK''\\)\")",
+      "Bash(.venv/bin/python:*)",
+      "Bash(.venv/bin/python -c:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)"
+    ]
+  }
+}

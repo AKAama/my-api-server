@@ -1,15 +1,15 @@
-from typing import Dict
-
-from fastapi import APIRouter, HTTPException, Query, Body, Request
+import httpx
+from fastapi import APIRouter, HTTPException, Body, Request, Query
 
 from app.models.model import (
-    Model,
     ModelCreateRequest,
     ModelUpdateRequest,
+    ModelGetRequest,
     ChatRequest,
-    MODELS,
     list_models,
     get_model_by_id,
+    get_model_by_name,
+    exists_model_with_name_excluding,
     create_model_entry,
     save_model,
     delete_model_entry,
@@ -23,40 +23,55 @@ router = APIRouter(prefix="/api/v1/models", tags=["models"])
 
 @router.post("/create", response_model=APIResponse)
 async def create_model(req: ModelCreateRequest) -> APIResponse:
-    for m in MODELS.values():
-        if m.name == req.name:
-            return error(409, "模型名称已存在")
+    if get_model_by_name(req.name) is not None:
+        return error(409, "模型名称已存在")
     model = create_model_entry(req)
     return success(model, "成功创建模型")
 
 
-@router.get("/{model_id}", response_model=APIResponse)
-async def get_model(model_id: str) -> APIResponse:
-    model = get_model_by_id(model_id)
-    if not model:
-        return error(404, "模型不存在")
-    return success(model, "查询成功")
-
-
-@router.get("/get", response_model=APIResponse)
-async def get_models(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1),
+async def _do_get_models(
+    req: ModelGetRequest,
 ) -> APIResponse:
+    """获取模型，支持单个查询或列表查询"""
+    # 如果传了 model_id，查询单个模型
+    if req.model_id:
+        model = get_model_by_id(req.model_id)
+        if not model:
+            return error(404, "模型不存在")
+        return success(model, "查询成功")
+
+    # 否则查询列表
     all_models = list_models()
     total = len(all_models)
-    start = (page - 1) * page_size
-    end = start + page_size
+    start = (req.page - 1) * req.page_size
+    end = start + req.page_size
     page_models = all_models[start:end]
     return success(
         {
             "list": page_models,
             "total": total,
-            "page": page,
-            "page_size": page_size,
+            "page": req.page,
+            "page_size": req.page_size,
         },
         "查询模型列表成功",
     )
+
+
+@router.post("/get", response_model=APIResponse)
+async def get_models_post(req: ModelGetRequest) -> APIResponse:
+    """POST 方式获取模型"""
+    return await _do_get_models(req)
+
+
+@router.get("/get", response_model=APIResponse)
+async def get_models_get(
+    model_id: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1),
+) -> APIResponse:
+    """GET 方式获取模型"""
+    req = ModelGetRequest(model_id=model_id, page=page, page_size=page_size)
+    return await _do_get_models(req)
 
 
 @router.put("/{model_id}", response_model=APIResponse)
@@ -65,13 +80,11 @@ async def update_model(model_id: str, req: ModelUpdateRequest) -> APIResponse:
     if not model:
         return error(404, "模型不存在")
 
-    if req.name and req.name != model.name:
-        for mid, m in MODELS.items():
-            if mid != model_id and m.name == req.name:
-                return error(409, "模型名称已存在")
+    if req.name and req.name != model.name and exists_model_with_name_excluding(req.name, model_id):
+        return error(409, "模型名称已存在")
 
-    update_data = req.dict(exclude_unset=True)
-    updated = model.copy(update=update_data)
+    update_data = req.model_dump(exclude_unset=True)
+    updated = model.model_copy(update=update_data)
     save_model(updated)
     return success(updated, "成功更新模型")
 
@@ -92,7 +105,14 @@ async def chat_with_model(
 ):
     model = get_model_by_id(model_id)
     if not model:
-        raise HTTPException(status_code=404, detail="模型不存在")
+        return error(404, "模型不存在")
+
+    # 与 Go 一致：API Key 校验
+    api_key = (model.api_key or "").strip()
+    if not api_key:
+        return error(500, "API Key 为空")
+    if any(c in api_key for c in "\r\n\t "):
+        return error(500, "API Key 包含非法字符")
 
     model_name = model.type or model.name
     payload = {
@@ -109,6 +129,9 @@ async def chat_with_model(
     if stream:
         return await stream_to_client(model, payload)
 
-    return await call_model_once(model, payload)
+    try:
+        return await call_model_once(model, payload)
+    except HTTPException as e:
+        return error(e.status_code, e.detail if isinstance(e.detail, str) else str(e.detail))
 
 
