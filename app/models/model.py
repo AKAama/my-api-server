@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 from pydantic import BaseModel, Field
 from uuid import uuid4
@@ -14,6 +14,7 @@ class ModelBase(BaseModel):
     timeout: int = Field(30, description="请求超时时间（秒）")
     type: str = Field("", description="模型类型")
     dimensions: int = Field(0, description="向量维度")
+    enable: int = Field(1, description="是否启用：1 可用，0 不可用")
 
 
 class ModelCreateRequest(ModelBase):
@@ -27,6 +28,7 @@ class ModelUpdateRequest(BaseModel):
     timeout: Optional[int] = None
     type: Optional[str] = None
     dimensions: Optional[int] = None
+    enable: Optional[int] = None
 
 
 class Model(ModelBase):
@@ -39,8 +41,14 @@ class ModelGetRequest(BaseModel):
     page_size: int = 10
 
 
+class ChatMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
 class ChatRequest(BaseModel):
-    prompt: str
+    prompt: Optional[str] = None
+    messages: Optional[List[ChatMessage]] = None
 
 
 def _record_to_model(r: ModelRecord) -> Model:
@@ -53,6 +61,7 @@ def _record_to_model(r: ModelRecord) -> Model:
         timeout=r.timeout,
         type=r.type,
         dimensions=r.dimensions,
+        enable=r.enable,
     )
 
 
@@ -103,6 +112,7 @@ def create_model_entry(req: ModelCreateRequest) -> Model:
             timeout=timeout,
             type=req.type,
             dimensions=req.dimensions,
+            enable=req.enable,
         )
         session.add(record)
         session.flush()
@@ -121,6 +131,7 @@ def save_model(model: Model) -> None:
         record.timeout = model.timeout
         record.type = model.type
         record.dimensions = model.dimensions
+        record.enable = model.enable
 
 
 def delete_model_entry(model_id: str) -> Optional[Model]:

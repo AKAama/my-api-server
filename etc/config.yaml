@@ -1,5 +1,6 @@
 server:
   port: 3000
+  sse_heartbeat_seconds: 15
 db:
   host: 127.0.0.1
   port: 3306
@@ -28,5 +29,4 @@ nats:
       password:
       seed: "SUAG5FS7H253CMJBZFATMT4E4CLPA22AX37DBUAGF3JPK4EJ7TQ7LBQ4LM"
       nkey: "UBUGBPDHPW44AA4I6YNUDJ4GFRSMNJFNMU64BMBJTQDXLLACII5CSXTP"
-
 

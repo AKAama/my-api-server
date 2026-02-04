@@ -27,6 +27,7 @@ class ModelRecord(Base):
     timeout: Mapped[int] = mapped_column("timeout", BigInteger, nullable=False, default=30)
     type: Mapped[str] = mapped_column("type", String(255), nullable=False)
     dimensions: Mapped[int] = mapped_column("dimensions", BigInteger, nullable=False, default=0)
+    enable: Mapped[int] = mapped_column("enable", Integer, nullable=False, default=1)
     created_at: Mapped[datetime | None] = mapped_column("created_at", DateTime, nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column("updated_at", DateTime, nullable=True)
 

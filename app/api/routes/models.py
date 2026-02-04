@@ -1,4 +1,5 @@
 import httpx
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Body, Request, Query
 
 from app.models.model import (
@@ -17,8 +18,10 @@ from app.models.model import (
 from app.models.response import APIResponse, success, error
 from app.services.chat import stream_to_client, call_model_once
 
-
 router = APIRouter(prefix="/api/v1/models", tags=["models"])
+
+PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "system_prompt.txt"
+SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8").strip()
 
 
 @router.post("/create", response_model=APIResponse)
@@ -30,7 +33,7 @@ async def create_model(req: ModelCreateRequest) -> APIResponse:
 
 
 async def _do_get_models(
-    req: ModelGetRequest,
+        req: ModelGetRequest,
 ) -> APIResponse:
     """获取模型，支持单个查询或列表查询"""
     # 如果传了 model_id，查询单个模型
@@ -65,9 +68,9 @@ async def get_models_post(req: ModelGetRequest) -> APIResponse:
 
 @router.get("/get", response_model=APIResponse)
 async def get_models_get(
-    model_id: str | None = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1),
+        model_id: str | None = Query(None),
+        page: int = Query(1, ge=1),
+        page_size: int = Query(10, ge=1),
 ) -> APIResponse:
     """GET 方式获取模型"""
     req = ModelGetRequest(model_id=model_id, page=page, page_size=page_size)
@@ -99,9 +102,9 @@ async def delete_model(model_id: str) -> APIResponse:
 
 @router.post("/chat/{model_id}")
 async def chat_with_model(
-    model_id: str,
-    request: Request,
-    req: ChatRequest = Body(...),
+        model_id: str,
+        request: Request,
+        req: ChatRequest = Body(...),
 ):
     model = get_model_by_id(model_id)
     if not model:
@@ -114,24 +117,33 @@ async def chat_with_model(
     if any(c in api_key for c in "\r\n\t "):
         return error(500, "API Key 包含非法字符")
 
-    model_name = model.type or model.name
-    payload = {
-        "model": model_name,
-        "messages": [
+    if req.messages:
+        messages = [m.model_dump() for m in req.messages if m.content]
+    elif req.prompt:
+        messages = [
             {
                 "role": "user",
                 "content": req.prompt,
             }
-        ],
+        ]
+    else:
+        return error(400, "prompt 或 messages 不能为空")
+
+    has_system = any(m.get("role") == "system" for m in messages)
+    if not has_system:
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+
+    payload = {
+        "model": model.type,
+        "messages": messages,
     }
 
     stream = request.query_params.get("stream") == "1"
     if stream:
+        payload["stream"] = True
         return await stream_to_client(model, payload)
 
     try:
         return await call_model_once(model, payload)
     except HTTPException as e:
         return error(e.status_code, e.detail if isinstance(e.detail, str) else str(e.detail))
-
-

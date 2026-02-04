@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class ServerConfig(BaseModel):
     port: int = 3000
+    sse_heartbeat_seconds: int = 15
 
 
 class DBConfig(BaseModel):
@@ -75,5 +76,4 @@ def get_settings(config_path: Optional[str] = None) -> Settings:
         raise ValueError("Config file is empty")
 
     return Settings(**raw)
-
 
