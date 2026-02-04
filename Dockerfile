@@ -14,15 +14,16 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+# 先创建用户
+RUN useradd -m appuser
 
-RUN pip install --upgrade pip \
-    && pip install . --no-build-isolation
+COPY pyproject.toml README.md ./
+RUN pip install --upgrade pip && pip install .
 
 COPY app/ ./app/
 COPY main.py ./
+RUN chown -R appuser /app
 
-RUN useradd -m appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000

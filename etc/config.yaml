@@ -2,10 +2,10 @@ server:
   port: 3000
   sse_heartbeat_seconds: 15
 db:
-  host: 127.0.0.1
+  host: rm-bp15esfst12fs44489o.mysql.rds.aliyuncs.com
   port: 3306
-  username: root
-  password: "12344"
+  username: myh
+  password: "Alex0813!"
   database: cmplus_qa
   maxConnections: 100
 milvus:

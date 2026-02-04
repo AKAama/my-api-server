@@ -56,7 +56,7 @@ class Settings(BaseModel):
 
 
 def _default_config_path() -> Path:
-    base_dir = Path(__file__).resolve().parents[2]
+    base_dir = Path(__file__).resolve().parents[1]
     return base_dir / "my-api-server" / "etc" / "config.yaml"
 
 

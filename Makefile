@@ -2,8 +2,8 @@ export SHELL := /bin/bash
 export SHELLOPTS := errexit:pipefail
 
 # 镜像基本信息
-REGISTRY    ?= testhub.sudytech.cn
-IMAGE_REPO  ?= webplus
+REGISTRY    ?= crpi-3xux8vqn35fw00z9.cn-shanghai.personal.cr.aliyuncs.com
+IMAGE_REPO  ?= project_hub
 APP_NAME    ?= my-api-server
 TAG         ?= 1.0.0
 
@@ -38,9 +38,41 @@ image-build-push: docker-buildx-init
 image-build-local:
 	docker build \
 		-f $(DOCKERFILE) \
-		-t $(IMAGE) .
+		-t $(IMAGE) \
+		-t $(APP_NAME):latest .
 
 # 查看镜像架构
 .PHONY: image-inspect
 image-inspect:
 	docker buildx imagetools inspect $(IMAGE)
+
+# 登录阿里云镜像仓库
+.PHONY: docker-login
+docker-login:
+	@echo "==> Logging in to Aliyun Registry"
+	@docker login --username=$(ALIYUN_USERNAME) $(REGISTRY)
+	@echo "==> Login successful"
+
+# 推送镜像到阿里云
+.PHONY: image-push
+image-push: docker-login
+	@echo "==> Pushing $(IMAGE)"
+	docker push $(IMAGE)
+
+# 打标签（用于本地构建后推送）
+.PHONY: image-tag
+image-tag:
+	@docker tag $(APP_NAME):latest $(IMAGE)
+
+# 完整构建并推送流程
+.PHONY: build-push
+build-push: image-build-local image-tag image-push
+
+# 查看当前镜像信息
+.PHONY: info
+info:
+	@echo "IMAGE: $(IMAGE)"
+	@echo "REGISTRY: $(REGISTRY)"
+	@echo "IMAGE_REPO: $(IMAGE_REPO)"
+	@echo "APP_NAME: $(APP_NAME)"
+	@echo "TAG: $(TAG)"
